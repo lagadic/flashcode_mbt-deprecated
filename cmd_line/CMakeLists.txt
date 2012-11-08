@@ -1,1 +1,1 @@
-add_library(cmd_line cmd_line.cpp cmd_line.h)
+rosbuild_add_library(cmd_line cmd_line.cpp cmd_line.h)
