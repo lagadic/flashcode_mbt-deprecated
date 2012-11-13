@@ -30,12 +30,13 @@
 #include <visp/vpMbEdgeTracker.h>
 #include "states.hpp"
 #include "events.h"
+#include "tracking_events.h"
 
 using namespace boost::accumulators;
 namespace msm = boost::msm;
 namespace mpl = boost::mpl;
 namespace tracking{
-
+  //class EventsBase;
   class Tracker_ : public msm::front::state_machine_def<Tracker_>{
   public:
     typedef struct {
@@ -54,17 +55,18 @@ namespace tracking{
     int iter_;
     std::ofstream varfile_;
     detectors::DetectorBase* detector_;
+    vpMbTracker* tracker_; // Create a model based tracker.
+
     typedef boost::array<vpHinkley,6> hinkley_array_t;
     hinkley_array_t hink_;
 
-    vpMbTracker* tracker_; // Create a model based tracker.
+
     vpMe tracker_me_config_;
     vpImage<vpRGBa> *I_;
     vpImage<vpRGBa> *_I;
     vpHomogeneousMatrix cMo_; // Pose computed using the tracker.
     vpCameraParameters cam_;
     vpImage<unsigned char> Igray_;
-    vpImagePoint flashcode_center_;
     std::vector<vpPoint> outer_points_3D_bcp_;
     std::vector<vpPoint> points3D_inner_;
     std::vector<vpPoint> points3D_outer_;
@@ -75,12 +77,16 @@ namespace tracking{
 
 
     statistics_t statistics;
+    vpImagePoint flashcode_center_;
+
     bool flush_display_;
 
+    EventsBase& tracking_events_;
   public:
     //getters to access useful members
     void set_flush_display(bool val);
     bool get_flush_display();
+    EventsBase& get_tracking_events();
     detectors::DetectorBase& get_detector();
     vpMbTracker& get_mbt();
     std::vector<vpPoint>& get_points3D_inner();
@@ -93,7 +99,7 @@ namespace tracking{
     vpCameraParameters& get_cam();
     CmdLine& get_cmd();
 
-    Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker_,bool flush_display = true);
+    Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker_,EventsBase& tracking_events,bool flush_display = true);
 
     typedef WaitingForInput initial_state;      //initial state of our state machine tracker
 

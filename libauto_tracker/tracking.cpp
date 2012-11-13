@@ -11,22 +11,24 @@
 #include <visp/vpImageIo.h>
 #include <visp/vpRect.h>
 #include "logfilewriter.hpp"
+#include "tracking_events.h"
 
 namespace tracking{
 
-  Tracker_:: Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker,bool flush_display) :
+  Tracker_:: Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker,EventsBase& tracking_events, bool flush_display) :
       cmd(cmd),
       iter_(0),
-      flashcode_center_(640/2,480/2),
       detector_(detector),
       tracker_(tracker),
-      flush_display_(flush_display){
-    std::cout << "starting tracker" << std::endl;
+      flashcode_center_(640/2,480/2),
+      flush_display_(flush_display),
+      tracking_events_(tracking_events){
+    tracking_events_.fsm_ = this;
     points3D_inner_ = cmd.get_inner_points_3D();
     points3D_outer_ = cmd.get_outer_points_3D();
     outer_points_3D_bcp_ = cmd.get_outer_points_3D();
     if(cmd.using_adhoc_recovery() || cmd.log_checkpoints()){
-      for(int i=0;i<points3D_outer_.size();i++){
+      for(unsigned int i=0;i<points3D_outer_.size();i++){
         vpPoint p;
         p.setWorldCoordinates(
                   (points3D_outer_[i].get_oX()+points3D_inner_[i].get_oX())*cmd.get_adhoc_recovery_ratio(),
@@ -130,7 +132,6 @@ namespace tracking{
 
   bool Tracker_:: flashcode_detected(input_ready const& evt){
     this->cam_ = evt.cam_;
-    clock_t t = clock();
     cv::Mat cvI;//(evt.I.getRows(),evt.I.getCols(),CV_8UC3);
 
     cv::Mat vpToMat((int)evt.I.getRows(), (int)evt.I.getCols(), CV_8UC4, (void*)evt.I.bitmap);
@@ -156,6 +157,7 @@ namespace tracking{
   bool Tracker_:: flashcode_redetected(input_ready const& evt){
     this->cam_ = evt.cam_;
     clock_t t = clock();
+    (void)t;
     cv::Mat cvI;
 
     //vpImageConvert::convert(evt.I,cvI);
@@ -179,7 +181,7 @@ namespace tracking{
     double centerY = (double)(polygon[0].y+polygon[1].y+polygon[2].y+polygon[3].y)/4.;
     vpPixelMeterConversion::convertPoint(cam_, flashcode_center_, centerX, centerY);
 
-    for(int i=0;i<f_.size();i++){
+    for(unsigned int i=0;i<f_.size();i++){
       double x=0, y=0;
       vpImagePoint poly_pt(polygon[i].y,polygon[i].x);
 
@@ -195,7 +197,7 @@ namespace tracking{
     vpImageConvert::convert(*I_,Igray_);
     vpPose pose;
 
-    for(int i=0;i<f_.size();i++)
+    for(unsigned int i=0;i<f_.size();i++)
       pose.addPoint(f_[i]);
 
     pose.computePose(vpPose::LAGRANGE,cMo_);
@@ -253,7 +255,7 @@ namespace tracking{
       vpMatrix mat = tracker_->getCovarianceMatrix();
       if(cmd.using_var_file()){
         writer.write(iter_);
-        for(int i=0;i<mat.getRows();i++)
+        for(unsigned int i=0;i<mat.getRows();i++)
           writer.write(mat[i][i]);
       }
       if(cmd.using_var_limit())
@@ -274,7 +276,7 @@ namespace tracking{
 
 
 
-      for(int i=0;i<mat.getRows();i++)
+      for(unsigned int i=0;i<mat.getRows();i++)
         statistics.var(mat[i][i]);
 
       if(mat.getRows() == 6){ //if the covariance matrix is set
@@ -288,12 +290,12 @@ namespace tracking{
 
       if(cmd.using_var_file() && cmd.log_pose()){
         vpPoseVector p(cMo_);
-        for(int i=0;i<p.getRows();i++)
+        for(unsigned int i=0;i<p.getRows();i++)
           writer.write(p[i]);
       }
 
       if(cmd.using_adhoc_recovery() || cmd.log_checkpoints()){
-        for(int p=0;p<points3D_middle_.size();p++){
+        for(unsigned int p=0;p<points3D_middle_.size();p++){
           vpPoint& point3D = points3D_middle_[p];
 
           double _u=0.,_v=0.,_u_inner=0.,_v_inner=0.;
@@ -350,7 +352,7 @@ namespace tracking{
                         boost::accumulators::tag::mean
                       >
                     > acc;
-    for(int i=0;i<points3D_outer_.size();i++){
+    for(unsigned int i=0;i<points3D_outer_.size();i++){
       points3D_outer_[i].project(cMo_);
       points3D_inner_[i].project(cMo_);
 
@@ -362,7 +364,6 @@ namespace tracking{
       acc(std::abs(u-u_inner));
       acc(std::abs(v-v_inner));
     }
-
     if(cmd.using_mbt_dynamic_range()){
       int range = (const unsigned int)(boost::accumulators::mean(acc)*cmd.get_mbt_dynamic_range());
 
@@ -374,8 +375,7 @@ namespace tracking{
       }else
         std::cout << "error: could not init moving edges on tracker that doesn't support them." << std::endl;
     }
-
-    cvTrackingBox_ = cv::boundingRect(points);
+    cvTrackingBox_ = cv::boundingRect(cv::Mat(points));
     int s_x = cvTrackingBox_.x,
         s_y = cvTrackingBox_.y,
         d_x = cvTrackingBox_.x + cvTrackingBox_.width,
@@ -401,6 +401,10 @@ namespace tracking{
 
   bool Tracker_:: get_flush_display(){
     return flush_display_;
+  }
+
+  EventsBase& Tracker_:: get_tracking_events(){
+    return tracking_events_;
   }
 }
 

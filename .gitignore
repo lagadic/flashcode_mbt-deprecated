@@ -4,3 +4,6 @@
 *.jpg
 data/images
 *.avi
+CMakeFiles
+cmake_install.cmake
+Makefile
