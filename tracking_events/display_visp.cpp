@@ -3,9 +3,13 @@
 #include "display_visp.h"
 #include "libauto_tracker/tracking.h"
 #include <visp/vpDisplay.h>
+#include <visp/vpMeterPixelConversion.h>
+#include <vector>
+#include <cassert>
+#include <fstream>
 
 namespace tracking_events{
-  DisplayVispEvents:: DisplayVispEvents(bool flush_display) : flush_display_(flush_display),iter_(0),plot_(NULL){
+  DisplayVispEvents:: DisplayVispEvents(bool flush_display) : flush_display_(flush_display),plot_(NULL),iter_(0){
 
   }
 

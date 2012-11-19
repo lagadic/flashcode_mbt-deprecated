@@ -5,18 +5,11 @@
 #include <boost/msm/back/state_machine.hpp>
 //front-end
 #include <boost/msm/front/state_machine_def.hpp>
-#include <visp/vpImage.h>
-#include <visp/vpRGBa.h>
+#include <visp/vpHomogeneousMatrix.h>
 #include <visp/vpMeterPixelConversion.h>
-#include <visp/vpPlot.h>
-#include <visp/vpRect.h>
-#include <visp/vpDisplay.h>
-#include <vector>
-#include <cassert>
-#include <fstream>
 #include <boost/thread.hpp>
 #include "events.h"
-
+//#include "nodelets/controller.h"
 
 
 namespace msm = boost::msm;
@@ -30,14 +23,14 @@ namespace tracking{
       template <class Event, class Fsm>
       void on_exit(Event const& evt, Fsm& fsm){
         std::cout <<"leaving: WaitingForInput" << std::endl;
-        fsm.get_tracking_events().on_initial_waiting_for_pattern(evt.I);
+        fsm.get_tracking_events()->on_initial_waiting_for_pattern(evt.I);
       }
   };
 
   struct Finished : public msm::front::state<>{
     template <class Event, class Fsm>
     void on_entry(Event const& evt, Fsm& fsm){
-      fsm.get_tracking_events().on_finished();
+      fsm.get_tracking_events()->on_finished();
     }
   };
 
@@ -57,7 +50,8 @@ namespace tracking{
     template <class Event, class Fsm>
     void on_exit(Event const& evt, Fsm& fsm)
     {
-      fsm.get_tracking_events().on_detect_pattern(evt.frame,evt.I,evt.cam_,fsm.get_detector());
+      //std::cout <<"bsm="<< (unsigned long)fsm.get_tracking_events()->get_bsm() << std::endl;
+      fsm.get_tracking_events()->on_detect_pattern(evt.frame,evt.I,evt.cam_,fsm.get_detector());
       std::cout <<"leaving: DetectFlashcode" << std::endl;
     }
   };
@@ -77,7 +71,8 @@ namespace tracking{
     template <class Fsm>
     void on_exit(input_ready const& evt, Fsm& fsm)
     {
-      fsm.get_tracking_events().on_redetect_pattern(evt.frame,evt.I,evt.cam_,fsm.get_detector(),fsm.template get_tracking_box< vpRect > ());
+      //std::cout << "tracker_eventst.t:" << (unsigned long)(dynamic_cast<visp_auto_tracker::AutoTrackerNodelet&>(fsm.get_tracking_events()).tracker_) << std::endl;
+      fsm.get_tracking_events()->on_redetect_pattern(evt.frame,evt.I,evt.cam_,fsm.get_detector(),fsm.template get_tracking_box< vpRect > ());
       std::cout <<"leaving: ReDetectFlashcode" << std::endl;
     }
 
@@ -115,7 +110,7 @@ namespace tracking{
         fsm.get_mbt().getPose(cMo);
 
 
-        fsm.get_tracking_events().on_detect_model(fsm.get_I(),fsm.get_cam(), cMo, fsm.get_mbt(), model_inner_corner,model_outer_corner);
+        fsm.get_tracking_events()->on_detect_model(fsm.get_I(),fsm.get_cam(), cMo, fsm.get_mbt(), model_inner_corner,model_outer_corner);
 
       }
   };
@@ -137,7 +132,7 @@ namespace tracking{
     {
       vpHomogeneousMatrix cMo;
       fsm.get_mbt().getPose(cMo);
-      fsm.get_tracking_events().on_track_model(evt.frame,evt.I,evt.cam_, cMo, fsm.get_mbt());
+      fsm.get_tracking_events()->on_track_model(evt.frame,evt.I,evt.cam_, cMo, fsm.get_mbt());
     }
   };
 }

@@ -6,10 +6,10 @@
 namespace tracking{
 
   struct input_ready{
-    input_ready(vpImage<vpRGBa>& I,vpCameraParameters& cam) : I(I),cam_(cam),frame(0){}
-    input_ready(vpImage<vpRGBa>& I,vpCameraParameters& cam,unsigned int frame) : I(I),cam_(cam),frame(frame){}
-    vpImage<vpRGBa>& I;
-    vpCameraParameters cam_;
+    input_ready(const vpImage<vpRGBa>& I,const vpCameraParameters& cam) : I(I),cam_(cam),frame(0) {}
+    input_ready(const vpImage<vpRGBa>& I,const vpCameraParameters& cam,unsigned int frame) : I(I),cam_(cam),frame(frame) {}
+    const vpImage<vpRGBa>& I;
+    const vpCameraParameters cam_;
     unsigned int frame;
   };
   struct select_input{

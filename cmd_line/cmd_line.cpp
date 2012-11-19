@@ -66,19 +66,19 @@ void CmdLine::loadConfig(std::string& config_file){
   po::notify(vm_);
   in.close();
 
-  for(int i =0;i<flashcode_coordinates.size()/3;i++){
+  for(unsigned int i =0;i<flashcode_coordinates.size()/3;i++){
     vpPoint p;
     p.setWorldCoordinates(flashcode_coordinates[i*3],flashcode_coordinates[i*3+1],flashcode_coordinates[i*3+2]);
     flashcode_points_3D_.push_back(p);
   }
 
-  for(int i =0;i<inner_coordinates.size()/3;i++){
+  for(unsigned int i =0;i<inner_coordinates.size()/3;i++){
     vpPoint p;
     p.setWorldCoordinates(inner_coordinates[i*3],inner_coordinates[i*3+1],inner_coordinates[i*3+2]);
     inner_points_3D_.push_back(p);
   }
 
-  for(int i =0;i<outer_coordinates.size()/3;i++){
+  for(unsigned int i =0;i<outer_coordinates.size()/3;i++){
     vpPoint p;
     p.setWorldCoordinates(outer_coordinates[i*3],outer_coordinates[i*3+1],outer_coordinates[i*3+2]);
     outer_points_3D_.push_back(p);
@@ -97,16 +97,22 @@ void CmdLine::loadConfig(std::string& config_file){
         case KLT:
           std::cout << "tracker with klt points";
           break;
+        default:
+          std::cout << "something unknown";
+          break;
       }
       std::cout << std::endl;
 
       std::cout << "Detector set to:";
-      switch(get_tracker_type()){
+      switch(get_detector_type()){
         case ZBAR:
           std::cout << "QR code";
           break;
         case DTMX:
           std::cout << "Datamatrix (flashcode)";
+          break;
+        default:
+          std::cout << "something unknown:" << vm_["detector-type"].as<std::string>();
           break;
       }
       std::cout << std::endl;

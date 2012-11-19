@@ -29,9 +29,6 @@ namespace datamatrix{
     if(reg != NULL) {
 
       int height;
-      int dataWordLength;
-      int rotateInt;
-      double rotate;
       DmtxVector2 p00, p10, p11, p01;
 
       height = dmtxDecodeGetProp(dec, DmtxPropHeight);

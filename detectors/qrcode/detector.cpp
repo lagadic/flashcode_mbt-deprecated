@@ -24,7 +24,7 @@ namespace qrcode{
     zbar::Image img(width, height, "Y800", gray_image.data, width * height);
 
     // scan the image for barcodes
-    int n = scanner_.scan(img);
+    scanner_.scan(img);
 
     // extract results
     for(zbar::Image::SymbolIterator symbol = img.symbol_begin();

@@ -37,6 +37,7 @@ namespace msm = boost::msm;
 namespace mpl = boost::mpl;
 namespace tracking{
   //class EventsBase;
+
   class Tracker_ : public msm::front::state_machine_def<Tracker_>{
   public:
     typedef struct {
@@ -62,8 +63,8 @@ namespace tracking{
 
 
     vpMe tracker_me_config_;
-    vpImage<vpRGBa> *I_;
-    vpImage<vpRGBa> *_I;
+    const vpImage<vpRGBa> *I_;
+    const vpImage<vpRGBa> *_I;
     vpHomogeneousMatrix cMo_; // Pose computed using the tracker.
     vpCameraParameters cam_;
     vpImage<unsigned char> Igray_;
@@ -81,12 +82,12 @@ namespace tracking{
 
     bool flush_display_;
 
-    EventsBase& tracking_events_;
+    EventsBase* tracking_events_;
   public:
     //getters to access useful members
     void set_flush_display(bool val);
     bool get_flush_display();
-    EventsBase& get_tracking_events();
+    EventsBase* get_tracking_events();
     detectors::DetectorBase& get_detector();
     vpMbTracker& get_mbt();
     std::vector<vpPoint>& get_points3D_inner();
@@ -95,11 +96,11 @@ namespace tracking{
     std::vector<vpPoint>& get_flashcode();
     template<class T>
     const T& get_tracking_box();
-    vpImage<vpRGBa>& get_I();
+    const vpImage<vpRGBa>& get_I();
     vpCameraParameters& get_cam();
     CmdLine& get_cmd();
 
-    Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker_,EventsBase& tracking_events,bool flush_display = true);
+    Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker_,EventsBase* tracking_events,bool flush_display = true);
 
     typedef WaitingForInput initial_state;      //initial state of our state machine tracker
 

@@ -13,9 +13,10 @@
 #include "logfilewriter.hpp"
 #include "tracking_events.h"
 
+
 namespace tracking{
 
-  Tracker_:: Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker,EventsBase& tracking_events, bool flush_display) :
+  Tracker_:: Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker,EventsBase* tracking_events, bool flush_display) :
       cmd(cmd),
       iter_(0),
       detector_(detector),
@@ -23,7 +24,8 @@ namespace tracking{
       flashcode_center_(640/2,480/2),
       flush_display_(flush_display),
       tracking_events_(tracking_events){
-    tracking_events_.fsm_ = this;
+    //std::cout << "tracker_eventst.t:" << (unsigned long)(dynamic_cast<visp_auto_tracker::AutoTrackerNodelet&>(tracking_events_).tracker_) << std::endl;
+    tracking_events_->fsm_ = this;
     points3D_inner_ = cmd.get_inner_points_3D();
     points3D_outer_ = cmd.get_outer_points_3D();
     outer_points_3D_bcp_ = cmd.get_outer_points_3D();
@@ -99,7 +101,7 @@ namespace tracking{
     return f_;
   }
 
-  vpImage<vpRGBa>& Tracker_:: get_I(){
+  const vpImage<vpRGBa>& Tracker_:: get_I(){
     return *I_;
   }
 
@@ -403,7 +405,7 @@ namespace tracking{
     return flush_display_;
   }
 
-  EventsBase& Tracker_:: get_tracking_events(){
+  EventsBase* Tracker_:: get_tracking_events(){
     return tracking_events_;
   }
 }
