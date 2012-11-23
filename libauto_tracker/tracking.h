@@ -5,29 +5,25 @@
 #include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/p_square_quantile.hpp>
 
-#include <iostream>
 // back-end
 #include <boost/msm/back/state_machine.hpp>
 //front-end
 #include <boost/msm/front/state_machine_def.hpp>
 #include <boost/array.hpp>
-#include <visp/vpImage.h>
-
 
 #include <visp/vpImage.h>
 #include <visp/vpRGBa.h>
 #include <visp/vpHomogeneousMatrix.h>
 #include <visp/vpCameraParameters.h>
-
 #include <visp/vpDisplay.h>
 #include <visp/vpHinkley.h>
-#include <visp/vpMe.h>
+
+#include <iostream>
 #include <vector>
 #include <fstream>
 
 #include "cmd_line/cmd_line.h"
 #include "detectors/detector_base.h"
-#include <visp/vpMbEdgeTracker.h>
 #include "states.hpp"
 #include "events.h"
 #include "tracking_events.h"
@@ -56,15 +52,14 @@ namespace tracking{
     int iter_;
     std::ofstream varfile_;
     detectors::DetectorBase* detector_;
-    vpMbTracker* tracker_; // Create a model based tracker.
 
     typedef boost::array<vpHinkley,6> hinkley_array_t;
     hinkley_array_t hink_;
 
 
-    vpMe tracker_me_config_;
-    const vpImage<vpRGBa> *I_;
-    const vpImage<vpRGBa> *_I;
+    //vpMe tracker_me_config_;
+    vpImage<vpRGBa> I_;
+    vpImage<vpRGBa> _I;
     vpHomogeneousMatrix cMo_; // Pose computed using the tracker.
     vpCameraParameters cam_;
     vpImage<unsigned char> Igray_;
@@ -89,7 +84,7 @@ namespace tracking{
     bool get_flush_display();
     EventsBase* get_tracking_events();
     detectors::DetectorBase& get_detector();
-    vpMbTracker& get_mbt();
+
     std::vector<vpPoint>& get_points3D_inner();
     std::vector<vpPoint>& get_points3D_outer();
     std::vector<vpPoint>& get_points3D_middle();
@@ -98,18 +93,17 @@ namespace tracking{
     const T& get_tracking_box();
     const vpImage<vpRGBa>& get_I();
     vpCameraParameters& get_cam();
+    vpHomogeneousMatrix& get_cMo();
     CmdLine& get_cmd();
 
-    Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker_,EventsBase* tracking_events,bool flush_display = true);
+    Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,EventsBase* tracking_events,bool flush_display = true);
 
     typedef WaitingForInput initial_state;      //initial state of our state machine tracker
 
     //Guards
-    bool input_selected(input_ready const& evt);
-    bool no_input_selected(input_ready const& evt);
     bool flashcode_detected(input_ready const& evt);
     bool flashcode_redetected(input_ready const& evt);
-    bool model_detected(msm::front::none const&);
+    bool model_detected(msm::front::none const& evt);
     bool mbt_success(input_ready const& evt);
 
     //actions
@@ -120,9 +114,7 @@ namespace tracking{
     struct transition_table : mpl::vector<
       //    Start               Event              Target                       Action                         Guard
       //   +------------------+--------------------+-----------------------+------------------------------+------------------------------+
-      g_row< WaitingForInput  , input_ready        , WaitingForInput       ,                               &Tracker_::no_input_selected    >,
-      //   +------------------+--------------------+-----------------------+------------------------------+------------------------------+
-      g_row< WaitingForInput  , input_ready        , DetectFlashcode       ,                               &Tracker_::input_selected       >,
+       _row< WaitingForInput  , input_ready        , WaitingForInput                                                                       >,
       //   +------------------+--------------------+-----------------------+------------------------------+------------------------------+
        _row< WaitingForInput  , select_input       , DetectFlashcode                                                                       >,
       //   +------------------+--------------------+-----------------------+------------------------------+------------------------------+

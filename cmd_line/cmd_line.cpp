@@ -1,7 +1,6 @@
 #include "cmd_line.h"
 #include <iostream>
 #include <fstream>
-#include <visp/vpMbEdgeTracker.h>
 
 void CmdLine::common(){
   po::options_description general("General options");
@@ -146,13 +145,7 @@ CmdLine:: CmdLine(int argc,char**argv) : should_exit_(false) {
 
 }
 
-vpCameraParameters CmdLine::get_cam_calib_params(){
-  vpCameraParameters cam;
-  vpMbEdgeTracker tmptrack;
-  tmptrack.loadConfigFile(get_xml_file().c_str() ); // Load the configuration of the tracker
-  tmptrack.getCameraParameters(cam);
-  return cam;
-}
+//TODO: get_cam_calib_params
 
 std::string CmdLine::get_log_file_pattern(){
   return log_file_pattern_;

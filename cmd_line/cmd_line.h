@@ -51,8 +51,6 @@ class CmdLine{
 
   bool using_hinkley();
 
-  vpCameraParameters get_cam_calib_params();
-
   double get_hinkley_alpha();
 
   double get_hinkley_delta();

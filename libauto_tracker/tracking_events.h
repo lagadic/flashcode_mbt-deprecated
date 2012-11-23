@@ -27,10 +27,9 @@ namespace tracking{
     virtual void on_detect_model(const vpImage<vpRGBa>& I,
                                  const vpCameraParameters& cam,
                                  const vpHomogeneousMatrix& cMo,
-                                 vpMbTracker& mbt,
                                  const std::vector<vpImagePoint>& model_inner_corner,
                                  const std::vector<vpImagePoint>& model_outer_corner) = 0;
-    virtual void on_track_model(const unsigned int iter,const vpImage<vpRGBa>& I,const vpCameraParameters& cam, const vpHomogeneousMatrix& cMo, vpMbTracker& mbt) = 0;
+    virtual void on_track_model(const unsigned int iter,const vpImage<vpRGBa>& I,const vpCameraParameters& cam, const vpHomogeneousMatrix& cMo) = 0;
 
   friend class Tracker_;
   };

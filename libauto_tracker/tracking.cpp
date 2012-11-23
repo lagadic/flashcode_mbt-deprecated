@@ -7,8 +7,6 @@
 #include <visp/vpDisplayX.h>
 #include <visp/vpPose.h>
 #include <visp/vpMeterPixelConversion.h>
-#include <visp/vpTrackingException.h>
-#include <visp/vpImageIo.h>
 #include <visp/vpRect.h>
 #include "logfilewriter.hpp"
 #include "tracking_events.h"
@@ -16,15 +14,13 @@
 
 namespace tracking{
 
-  Tracker_:: Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,vpMbTracker* tracker,EventsBase* tracking_events, bool flush_display) :
+  Tracker_:: Tracker_(CmdLine& cmd, detectors::DetectorBase* detector,EventsBase* tracking_events, bool flush_display) :
       cmd(cmd),
       iter_(0),
       detector_(detector),
-      tracker_(tracker),
       flashcode_center_(640/2,480/2),
       flush_display_(flush_display),
       tracking_events_(tracking_events){
-    //std::cout << "tracker_eventst.t:" << (unsigned long)(dynamic_cast<visp_auto_tracker::AutoTrackerNodelet&>(tracking_events_).tracker_) << std::endl;
     tracking_events_->fsm_ = this;
     points3D_inner_ = cmd.get_inner_points_3D();
     points3D_outer_ = cmd.get_outer_points_3D();
@@ -64,24 +60,11 @@ namespace tracking{
         i->init(cmd.get_hinkley_alpha(),cmd.get_hinkley_delta());
     }
 
-    if(cmd.using_mbt_dynamic_range()){
-      vpMbEdgeTracker *tracker_me = dynamic_cast<vpMbEdgeTracker*>(tracker_);
-      if(tracker_me)
-        tracker_me->getMovingEdge(tracker_me_config_);
-      else
-        std::cout << "error: could not init moving edges on tracker that doesn't support them." << std::endl;
-    }
-
-    tracker_->loadConfigFile(cmd.get_xml_file().c_str() ); // Load the configuration of the tracker
-    tracker_->loadModel(cmd.get_wrl_file().c_str()); // load the 3d model, to read .wrl model the 3d party library coin is required, if coin is not installed .cao file can be used.
+//TODO: Init for dynamic range was here. this should be done in main
   }
 
   detectors::DetectorBase& Tracker_:: get_detector(){
     return *detector_;
-  }
-
-  vpMbTracker& Tracker_:: get_mbt(){
-    return *tracker_;
   }
 
   std::vector<vpPoint>& Tracker_:: get_points3D_inner(){
@@ -102,11 +85,15 @@ namespace tracking{
   }
 
   const vpImage<vpRGBa>& Tracker_:: get_I(){
-    return *I_;
+    return I_;
   }
 
   vpCameraParameters& Tracker_:: get_cam(){
     return cam_;
+  }
+
+  vpHomogeneousMatrix& Tracker_:: get_cMo(){
+    return cMo_;
   }
 
   CmdLine& Tracker_:: get_cmd(){
@@ -123,14 +110,7 @@ namespace tracking{
     return vpTrackingBox_;
   }
 
-  bool Tracker_:: input_selected(input_ready const& evt){
-    return vpDisplay::getClick(evt.I,false);
-  }
 
-
-  bool Tracker_:: no_input_selected(input_ready const& evt){
-    return !input_selected(evt);
-  }
 
   bool Tracker_:: flashcode_detected(input_ready const& evt){
     this->cam_ = evt.cam_;
@@ -191,12 +171,20 @@ namespace tracking{
       f_[i].set_x(x);
       f_[i].set_y(y);
     }
-    I_ = _I = &(evt.I);
+    //FIXME: don't need these copies
+    _I = evt.I;
+    I_ = _I;
+    Igray_.resize(I_.getRows(),I_.getCols());
   }
 
 
-  bool Tracker_:: model_detected(msm::front::none const&){
-    vpImageConvert::convert(*I_,Igray_);
+  bool Tracker_:: model_detected(msm::front::none const& evt){
+    if(!I_.getCols() || !I_.getRows() || !Igray_.getCols() || !Igray_.getRows() ){
+      std::cout << "uninitialized image" <<std::endl;
+      throw std::runtime_error("uninitialized image");
+    }
+
+    vpImageConvert::convert(I_,Igray_);
     vpPose pose;
 
     for(unsigned int i=0;i<f_.size();i++)
@@ -204,7 +192,6 @@ namespace tracking{
 
     pose.computePose(vpPose::LAGRANGE,cMo_);
     pose.computePose(vpPose::VIRTUAL_VS,cMo_);
-    vpDisplay::displayFrame(*I_,cMo_,cam_,0.01,vpColor::none,2);
 
     std::vector<vpImagePoint> model_inner_corner(4);
     std::vector<vpImagePoint> model_outer_corner(4);
@@ -221,133 +208,111 @@ namespace tracking{
       }
     }
 
-    try{
-      if(cmd.get_tracker_type()==CmdLine::MBT){
-        vpMbEdgeTracker* me_tracker = dynamic_cast<vpMbEdgeTracker*>(tracker_);
-        me_tracker->resetTracker();
-        me_tracker->loadConfigFile(cmd.get_xml_file().c_str() );
-        me_tracker->loadModel(cmd.get_wrl_file().c_str());
-      }
+    //TODO: callback for tracking convergence steps (cmd.get_mbt_convergence_steps())
 
-      tracker_->initFromPose(Igray_,cMo_);
-
-      tracker_->track(Igray_); // track the object on this image
-      tracker_->getPose(cMo_); // get the pose
-      tracker_->setCovarianceComputation(true);
-      for(int i=0;i<cmd.get_mbt_convergence_steps();i++){
-        tracker_->track(Igray_); // track the object on this image
-        tracker_->getPose(cMo_); // get the pose
-      }
-    }catch(vpTrackingException& e){
-      std::cout << "Tracking failed" << std::endl;
-      std::cout << e.getStringMessage() << std::endl;
-      return false;
-    }
-    //vpDisplay::getClick(*I_);
     return true;
   }
 
   bool Tracker_:: mbt_success(input_ready const& evt){
     iter_ = evt.frame;
-    try{
-      LogFileWriter writer(varfile_); //the destructor of this class will act as a finally statement
-      vpImageConvert::convert(evt.I,Igray_);
-      tracker_->track(Igray_); // track the object on this image
-      tracker_->getPose(cMo_);
-      vpMatrix mat = tracker_->getCovarianceMatrix();
-      if(cmd.using_var_file()){
-        writer.write(iter_);
-        for(unsigned int i=0;i<mat.getRows();i++)
-          writer.write(mat[i][i]);
-      }
-      if(cmd.using_var_limit())
-        for(int i=0; i<6; i++)
-          if(mat[i][i]>cmd.get_var_limit())
-            return false;
-      if(cmd.using_hinkley())
-        for(int i=0; i<6; i++){
-          if(hink_[i].testDownUpwardJump(mat[i][i]) != vpHinkley::noJump){
-            writer.write(mat[i][i]);
-            if(cmd.get_verbose())
-              std::cout << "Hinkley:detected jump!" << std::endl;
-            return false;
-          }
-        }
-      if(cmd.using_var_file() && cmd.using_mbt_dynamic_range())
-        writer.write(tracker_me_config_.getRange());
 
+    LogFileWriter writer(varfile_); //the destructor of this class will act as a finally statement
+    vpImageConvert::convert(evt.I,Igray_);
 
-
+    cMo_ = evt.cMo;
+    vpMatrix mat; //TODO: covariance init
+    if(cmd.using_var_file()){
+      writer.write(iter_);
       for(unsigned int i=0;i<mat.getRows();i++)
-        statistics.var(mat[i][i]);
-
-      if(mat.getRows() == 6){ //if the covariance matrix is set
-        statistics.var_x(mat[0][0]);
-        statistics.var_y(mat[1][1]);
-        statistics.var_z(mat[2][2]);
-        statistics.var_wx(mat[3][3]);
-        statistics.var_wy(mat[4][4]);
-        statistics.var_wz(mat[5][5]);
-      }
-
-      if(cmd.using_var_file() && cmd.log_pose()){
-        vpPoseVector p(cMo_);
-        for(unsigned int i=0;i<p.getRows();i++)
-          writer.write(p[i]);
-      }
-
-      if(cmd.using_adhoc_recovery() || cmd.log_checkpoints()){
-        for(unsigned int p=0;p<points3D_middle_.size();p++){
-          vpPoint& point3D = points3D_middle_[p];
-
-          double _u=0.,_v=0.,_u_inner=0.,_v_inner=0.;
-          point3D.project(cMo_);
-          vpMeterPixelConversion::convertPoint(cam_,point3D.get_x(),point3D.get_y(),_u,_v);
-          vpMeterPixelConversion::convertPoint(cam_,points3D_inner_[p].get_x(),points3D_inner_[p].get_y(),_u_inner,_v_inner);
-
-          boost::accumulators::accumulator_set<
-                  unsigned char,
-                  boost::accumulators::stats<
-                    boost::accumulators::tag::median(boost::accumulators::with_p_square_quantile)
-                  >
-                > acc;
-
-          int region_width= std::max((int)(std::abs(_u-_u_inner)*cmd.get_adhoc_recovery_size()),1);
-          int region_height=std::max((int)(std::abs(_v-_v_inner)*cmd.get_adhoc_recovery_size()),1);
-          int u=(int)_u;
-          int v=(int)_v;
-          for(int i=std::max(u-region_width,0);
-              i<std::min(u+region_width,(int)evt.I.getWidth());
-              i++){
-            for(int j=std::max(v-region_height,0);
-                j<std::min(v+region_height,(int)evt.I.getHeight());
-                j++){
-              acc(Igray_[j][i]);
-              statistics.checkpoints(Igray_[j][i]);
-            }
-          }
-          double checkpoints_median = boost::accumulators::median(acc);
-          if(cmd.using_var_file() && cmd.log_checkpoints())
-            writer.write(checkpoints_median);
-          if( cmd.using_adhoc_recovery() && (unsigned int)checkpoints_median>cmd.get_adhoc_recovery_treshold() )
-            return false;
-        }
-
-
-      }
-
-    }catch(vpTrackingException& e){
-      std::cout << "Tracking lost" << std::endl;
-      return false;
+        writer.write(mat[i][i]);
     }
+    if(cmd.using_var_limit())
+      for(int i=0; i<6; i++)
+        if(mat[i][i]>cmd.get_var_limit())
+          return false;
+    if(cmd.using_hinkley())
+      for(int i=0; i<6; i++){
+        if(hink_[i].testDownUpwardJump(mat[i][i]) != vpHinkley::noJump){
+          writer.write(mat[i][i]);
+          if(cmd.get_verbose())
+            std::cout << "Hinkley:detected jump!" << std::endl;
+          return false;
+        }
+      }
+    //TODO: log dynamic range somehow
+    //if(cmd.using_var_file() && cmd.using_mbt_dynamic_range())
+    //  writer.write(tracker_me_config_.getRange());
+
+
+
+    for(unsigned int i=0;i<mat.getRows();i++)
+      statistics.var(mat[i][i]);
+
+    if(mat.getRows() == 6){ //if the covariance matrix is set
+      statistics.var_x(mat[0][0]);
+      statistics.var_y(mat[1][1]);
+      statistics.var_z(mat[2][2]);
+      statistics.var_wx(mat[3][3]);
+      statistics.var_wy(mat[4][4]);
+      statistics.var_wz(mat[5][5]);
+    }
+
+    if(cmd.using_var_file() && cmd.log_pose()){
+      vpPoseVector p(cMo_);
+      for(unsigned int i=0;i<p.getRows();i++)
+        writer.write(p[i]);
+    }
+
+    if(cmd.using_adhoc_recovery() || cmd.log_checkpoints()){
+      for(unsigned int p=0;p<points3D_middle_.size();p++){
+        vpPoint& point3D = points3D_middle_[p];
+
+        double _u=0.,_v=0.,_u_inner=0.,_v_inner=0.;
+        point3D.project(cMo_);
+        vpMeterPixelConversion::convertPoint(cam_,point3D.get_x(),point3D.get_y(),_u,_v);
+        vpMeterPixelConversion::convertPoint(cam_,points3D_inner_[p].get_x(),points3D_inner_[p].get_y(),_u_inner,_v_inner);
+
+        boost::accumulators::accumulator_set<
+                unsigned char,
+                boost::accumulators::stats<
+                  boost::accumulators::tag::median(boost::accumulators::with_p_square_quantile)
+                >
+              > acc;
+
+        int region_width= std::max((int)(std::abs(_u-_u_inner)*cmd.get_adhoc_recovery_size()),1);
+        int region_height=std::max((int)(std::abs(_v-_v_inner)*cmd.get_adhoc_recovery_size()),1);
+        int u=(int)_u;
+        int v=(int)_v;
+        for(int i=std::max(u-region_width,0);
+            i<std::min(u+region_width,(int)evt.I.getWidth());
+            i++){
+          for(int j=std::max(v-region_height,0);
+              j<std::min(v+region_height,(int)evt.I.getHeight());
+              j++){
+            acc(Igray_[j][i]);
+            statistics.checkpoints(Igray_[j][i]);
+          }
+        }
+        double checkpoints_median = boost::accumulators::median(acc);
+        if(cmd.using_var_file() && cmd.log_checkpoints())
+          writer.write(checkpoints_median);
+        if( cmd.using_adhoc_recovery() && (unsigned int)checkpoints_median>cmd.get_adhoc_recovery_treshold() )
+          return false;
+      }
+    }
+
     return true;
   }
 
   void Tracker_:: track_model(input_ready const& evt){
     this->cam_ = evt.cam_;
     std::vector<cv::Point> points;
-    I_ = _I = &(evt.I);
-    vpImageConvert::convert(evt.I,Igray_);
+    //FIXME: don't need these copies
+    _I = evt.I;
+    I_ = _I;
+    Igray_.resize(I_.getRows(),I_.getCols());
+
+    vpImageConvert::convert(I_,Igray_);
     boost::accumulators::accumulator_set<
                       double,
                       boost::accumulators::stats<
@@ -369,13 +334,7 @@ namespace tracking{
     if(cmd.using_mbt_dynamic_range()){
       int range = (const unsigned int)(boost::accumulators::mean(acc)*cmd.get_mbt_dynamic_range());
 
-      vpMbEdgeTracker *tracker_me = dynamic_cast<vpMbEdgeTracker*>(tracker_);
-      if(tracker_me){
-        tracker_me->getMovingEdge(tracker_me_config_);
-        tracker_me_config_.setRange(range);
-        tracker_me->setMovingEdge(tracker_me_config_);
-      }else
-        std::cout << "error: could not init moving edges on tracker that doesn't support them." << std::endl;
+      //TODO: callback dynamic range
     }
     cvTrackingBox_ = cv::boundingRect(cv::Mat(points));
     int s_x = cvTrackingBox_.x,

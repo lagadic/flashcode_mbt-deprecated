@@ -7,10 +7,9 @@
 #include <boost/msm/front/state_machine_def.hpp>
 #include <visp/vpHomogeneousMatrix.h>
 #include <visp/vpMeterPixelConversion.h>
-#include <boost/thread.hpp>
 #include "events.h"
-//#include "nodelets/controller.h"
 
+//TODO: handle event for tracking stabilisation
 
 namespace msm = boost::msm;
 
@@ -35,6 +34,10 @@ namespace tracking{
   };
 
   struct DetectFlashcode: public msm::front::state<> {
+    bool reached;
+    DetectFlashcode(){
+      reached=false;
+    }
     template <class Fsm>
     void on_entry(finished const& evt, Fsm& fsm){}
 
@@ -44,15 +47,15 @@ namespace tracking{
     template <class Event, class Fsm>
     void on_entry(Event const&, Fsm&)
     {
-      std::cout <<"entering: DetectFlashcode" << std::endl;
+      //std::cout <<"entering: DetectFlashcode" << std::endl;
 
     }
     template <class Event, class Fsm>
     void on_exit(Event const& evt, Fsm& fsm)
     {
-      //std::cout <<"bsm="<< (unsigned long)fsm.get_tracking_events()->get_bsm() << std::endl;
-      fsm.get_tracking_events()->on_detect_pattern(evt.frame,evt.I,evt.cam_,fsm.get_detector());
-      std::cout <<"leaving: DetectFlashcode" << std::endl;
+      reached=true;
+      //fsm.get_tracking_events()->on_detect_pattern(evt.frame,evt.I,evt.cam_,fsm.get_detector());
+      //std::cout <<"leaving: DetectFlashcode" << std::endl;
     }
   };
   struct ReDetectFlashcode: public msm::front::state<> {
@@ -80,6 +83,11 @@ namespace tracking{
 
   struct DetectModel : public msm::front::state<>
   {
+    DetectModel(){
+      reached=false;
+    }
+    bool reached;
+    vpHomogeneousMatrix cMo;
       template <class Fsm>
       void on_entry(finished const& evt, Fsm& fsm){}
 
@@ -94,6 +102,7 @@ namespace tracking{
       template <class Event, class Fsm>
       void on_exit(Event const& evt, Fsm& fsm)
       {
+
         std::cout <<"leaving: DetectModel" << std::endl;
         std::vector<vpPoint>& points3D_inner = fsm.get_points3D_inner();
         std::vector<vpPoint>& points3D_outer = fsm.get_points3D_outer();
@@ -105,13 +114,10 @@ namespace tracking{
           vpMeterPixelConversion::convertPoint(fsm.get_cam(),points3D_inner[i].get_x(),points3D_inner[i].get_y(),model_inner_corner[i]);
         }
 
-
-        vpHomogeneousMatrix cMo;
-        fsm.get_mbt().getPose(cMo);
-
-
-        fsm.get_tracking_events()->on_detect_model(fsm.get_I(),fsm.get_cam(), cMo, fsm.get_mbt(), model_inner_corner,model_outer_corner);
-
+        cMo = fsm.get_cMo();
+        //if(reached)
+        //  fsm.get_tracking_events()->on_detect_model(fsm.get_I(),fsm.get_cam(), fsm.get_cMo(), model_inner_corner,model_outer_corner);
+        reached = true;
       }
   };
 
@@ -130,9 +136,7 @@ namespace tracking{
     template <class Event, class Fsm>
     void on_exit(Event const& evt, Fsm& fsm)
     {
-      vpHomogeneousMatrix cMo;
-      fsm.get_mbt().getPose(cMo);
-      fsm.get_tracking_events()->on_track_model(evt.frame,evt.I,evt.cam_, cMo, fsm.get_mbt());
+      fsm.get_tracking_events()->on_track_model(evt.frame,evt.I,evt.cam_, evt.cMo);
     }
   };
 }
