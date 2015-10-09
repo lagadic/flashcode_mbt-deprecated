@@ -1,3 +1,7 @@
+# Deprecated
+This project is deprecated. Its content was introduced in http://github.com/lagadic/vision_vip
+
+# flashcode_mbt
 This is a hybrid tracker using two libraries:
 - visp for model-based tracking (http://www.irisa.fr/lagadic/visp/visp.html)
 - libdtmx for flashcode detection (http://www.libdmtx.org/)
